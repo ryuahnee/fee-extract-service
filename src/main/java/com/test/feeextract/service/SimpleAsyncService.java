@@ -4,6 +4,7 @@ import com.test.feeextract.domain.JobInfo;
 import com.test.feeextract.domain.JobStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -64,6 +65,43 @@ public class SimpleAsyncService {
     // 작업 실패 처리
     public void failJob(String jobId, String errorMessage) {
         updateJob(jobId,JobStatus.FAILED ,0, errorMessage);
+    }
+
+
+    // 주기적으로 오래된 작업 정리 (메모리 누수 방지)
+    @Scheduled(fixedRate = 300000) // 5분마다 실행
+    public void cleanupOldJobs() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(10);
+        int beforeSize = jobs.size();
+        
+        jobs.entrySet().removeIf(entry -> {
+            JobInfo job = entry.getValue();
+            return job.getStartTime().isBefore(cutoff) && 
+                   (job.getStatus() == JobStatus.COMPLETED || job.getStatus() == JobStatus.FAILED);
+        });
+        
+        int afterSize = jobs.size();
+        if (beforeSize > afterSize) {
+            log.info("🧹 오래된 작업 정리 완료 - 정리 전: {}개, 정리 후: {}개", beforeSize, afterSize);
+        }
+    }
+
+    // 현재 메모리 사용량 로깅
+    @Scheduled(fixedRate = 60000) // 1분마다 실행
+    public void logMemoryUsage() {
+        Runtime runtime = Runtime.getRuntime();
+        long maxMemory = runtime.maxMemory();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+        
+        double usagePercent = (double) usedMemory / maxMemory * 100;
+        
+        log.info("📊 메모리 상태 - 사용: {}MB/{}MB ({}%), 활성 작업: {}개", 
+                usedMemory / 1024 / 1024,
+                maxMemory / 1024 / 1024,
+                String.format("%.2f", usagePercent),
+                jobs.size());
     }
 
 

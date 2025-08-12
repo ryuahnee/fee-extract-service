@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메모리 사용량 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .memory-button {
+            background-color: #2196F3;
+        }
+        .memory-button:hover {
+            background-color: #0b7dda;
+        }
+        .danger-button {
+            background-color: #f44336;
+        }
+        .danger-button:hover {
+            background-color: #da190b;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .memory-info {
+            background-color: #f0f8ff;
+            border: 1px solid #add8e6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .job-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .status-running {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        .status-completed {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .status-failed {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 메모리 사용량 테스트</h1>
+        
+        <!-- 현재 메모리 상태 -->
+        <div class="test-section">
+            <h3>💾 현재 메모리 상태</h3>
+            <button class="memory-button" onclick="checkMemoryStatus()">메모리 상태 확인</button>
+            <button class="danger-button" onclick="forceGC()">가비지 컬렉션 실행</button>
+            <div id="memoryStatus" class="memory-info" style="display: none;">
+                메모리 정보가 여기에 표시됩니다.
+            </div>
+        </div>
+
+        <!-- 50만건 데이터 테스트 -->
+        <div class="test-section">
+            <h3>🚀 50만건 데이터 처리 테스트</h3>
+            <p>두 가지 방식으로 50만건 데이터를 처리하고 메모리 사용량을 비교합니다.</p>
+            
+            <div>
+                <label>데이터 크기: </label>
+                <select id="dataSize">
+                    <option value="10000">1만건</option>
+                    <option value="50000">5만건</option>
+                    <option value="100000">10만건</option>
+                    <option value="500000" selected>50만건</option>
+                    <option value="1000000">100만건</option>
+                </select>
+            </div>
+            
+            <button onclick="testLargeData()">일반 처리 (전체 메모리 로딩)</button>
+            <button onclick="testStreamingData()">스트리밍 처리 (메모리 효율적)</button>
+            <button onclick="testMemoryComparison()">크기별 비교 테스트</button>
+            
+            <div id="testResults"></div>
+        </div>
+
+        <!-- 실행 중인 작업 모니터링 -->
+        <div class="test-section">
+            <h3>⚙️ 실행 중인 작업 모니터링</h3>
+            <div id="jobMonitoring">
+                실행 중인 작업이 없습니다.
+            </div>
+        </div>
+
+        <!-- 메모리 사용량 비교 표 -->
+        <div class="test-section">
+            <h3>📈 메모리 사용량 비교</h3>
+            <table id="memoryComparisonTable">
+                <thead>
+                    <tr>
+                        <th>데이터 크기</th>
+                        <th>처리 방식</th>
+                        <th>메모리 사용량</th>
+                        <th>처리 시간</th>
+                        <th>상태</th>
+                    </tr>
+                </thead>
+                <tbody id="comparisonTableBody">
+                    <!-- 동적으로 추가됩니다 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let activeJobs = new Map();
+        let monitoringInterval;
+
+        // 메모리 상태 확인
+        async function checkMemoryStatus() {
+            try {
+                const response = await fetch('/memory-test/memory-status');
+                const memoryInfo = await response.json();
+                
+                const memoryDiv = document.getElementById('memoryStatus');
+                memoryDiv.style.display = 'block';
+                memoryDiv.innerHTML = `
+                    <h4>현재 메모리 상태</h4>
+                    <p>사용 중: ${memoryInfo.usedMemoryMB.toLocaleString()}MB</p>
+                    <p>최대 가용: ${memoryInfo.maxMemoryMB.toLocaleString()}MB</p>
+                    <p>사용률: ${memoryInfo.usagePercent.toFixed(2)}%</p>
+                    <p>여유 메모리: ${memoryInfo.freeMemoryMB.toLocaleString()}MB</p>
+                `;
+            } catch (error) {
+                console.error('메모리 상태 확인 실패:', error);
+            }
+        }
+
+        // 가비지 컬렉션 실행
+        async function forceGC() {
+            try {
+                const response = await fetch('/memory-test/gc', { method: 'POST' });
+                const result = await response.text();
+                alert(result);
+                
+                // 메모리 상태 다시 확인
+                checkMemoryStatus();
+            } catch (error) {
+                console.error('GC 실행 실패:', error);
+            }
+        }
+
+        // 일반 대용량 데이터 테스트
+        async function testLargeData() {
+            const dataSize = document.getElementById('dataSize').value;
+            
+            try {
+                const response = await fetch(`/memory-test/large-data?dataSize=${dataSize}`, {
+                    method: 'POST'
+                });
+                const result = await response.text();
+                
+                // 작업 ID 추출
+                const jobId = extractJobId(result);
+                if (jobId) {
+                    activeJobs.set(jobId, {
+                        type: '일반 처리',
+                        dataSize: dataSize,
+                        startTime: new Date()
+                    });
+                    startJobMonitoring();
+                }
+                
+                addTestResult(result, 'success');
+            } catch (error) {
+                addTestResult('일반 처리 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 스트리밍 대용량 데이터 테스트
+        async function testStreamingData() {
+            const dataSize = document.getElementById('dataSize').value;
+            
+            try {
+                const response = await fetch(`/memory-test/large-data-streaming?dataSize=${dataSize}`, {
+                    method: 'POST'
+                });
+                const result = await response.text();
+                
+                // 작업 ID 추출
+                const jobId = extractJobId(result);
+                if (jobId) {
+                    activeJobs.set(jobId, {
+                        type: '스트리밍 처리',
+                        dataSize: dataSize,
+                        startTime: new Date()
+                    });
+                    startJobMonitoring();
+                }
+                
+                addTestResult(result, 'success');
+            } catch (error) {
+                addTestResult('스트리밍 처리 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 메모리 비교 테스트
+        async function testMemoryComparison() {
+            try {
+                const response = await fetch('/memory-test/memory-comparison', {
+                    method: 'POST'
+                });
+                const result = await response.text();
+                addTestResult(result, 'success');
+                
+                // 자동 모니터링 시작
+                startJobMonitoring();
+            } catch (error) {
+                addTestResult('비교 테스트 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 작업 ID 추출
+        function extractJobId(text) {
+            const match = text.match(/작업 ID: ([a-f0-9-]+)/);
+            return match ? match[1] : null;
+        }
+
+        // 테스트 결과 추가
+        function addTestResult(message, type) {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = `
+                <p><strong>${new Date().toLocaleTimeString()}</strong>: ${message}</p>
+            `;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        // 작업 모니터링 시작
+        function startJobMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+            }
+            
+            monitoringInterval = setInterval(async () => {
+                await updateJobStatuses();
+            }, 2000); // 2초마다 상태 체크
+        }
+
+        // 작업 상태 업데이트
+        async function updateJobStatuses() {
+            const monitoringDiv = document.getElementById('jobMonitoring');
+            
+            if (activeJobs.size === 0) {
+                monitoringDiv.innerHTML = '실행 중인 작업이 없습니다.';
+                if (monitoringInterval) {
+                    clearInterval(monitoringInterval);
+                    monitoringInterval = null;
+                }
+                return;
+            }
+            
+            let html = '<h4>실행 중인 작업들</h4>';
+            
+            for (const [jobId, jobMeta] of activeJobs) {
+                try {
+                    const response = await fetch(`/memory-test/job/${jobId}`);
+                    const jobInfo = await response.json();
+                    
+                    const statusClass = `status-${jobInfo.status.toLowerCase()}`;
+                    const elapsedTime = Math.floor((new Date() - jobMeta.startTime) / 1000);
+                    
+                    html += `
+                        <div class="job-status ${statusClass}">
+                            <strong>${jobMeta.type} (${Number(jobMeta.dataSize).toLocaleString()}건)</strong>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${jobInfo.progress}%"></div>
+                            </div>
+                            <p>상태: ${jobInfo.status} (${jobInfo.progress}%)</p>
+                            <p>메시지: ${jobInfo.message}</p>
+                            <p>경과 시간: ${elapsedTime}초</p>
+                            <p>작업 ID: ${jobId}</p>
+                        </div>
+                    `;
+                    
+                    // 완료된 작업 처리
+                    if (jobInfo.status === 'COMPLETED' || jobInfo.status === 'FAILED') {
+                        // 비교 테이블에 추가
+                        addToComparisonTable(jobMeta, jobInfo, elapsedTime);
+                        
+                        // 활성 작업에서 제거
+                        activeJobs.delete(jobId);
+                        
+                        // 메모리 상태 업데이트
+                        setTimeout(checkMemoryStatus, 1000);
+                    }
+                } catch (error) {
+                    console.error(`작업 ${jobId} 상태 확인 실패:`, error);
+                    activeJobs.delete(jobId);
+                }
+            }
+            
+            monitoringDiv.innerHTML = html;
+        }
+
+        // 비교 테이블에 결과 추가
+        function addToComparisonTable(jobMeta, jobInfo, elapsedTime) {
+            const tableBody = document.getElementById('comparisonTableBody');
+            const row = document.createElement('tr');
+            
+            // 메모리 사용량 정보 추출
+            let memoryUsage = '정보 없음';
+            if (jobInfo.message && jobInfo.message.includes('메모리 사용량')) {
+                const memoryMatch = jobInfo.message.match(/최대 사용량: (\d+)MB/);
+                if (memoryMatch) {
+                    memoryUsage = memoryMatch[1] + 'MB';
+                }
+            }
+            
+            const statusColor = jobInfo.status === 'COMPLETED' ? '#4CAF50' : 
+                               jobInfo.status === 'FAILED' ? '#f44336' : '#ff9800';
+            
+            row.innerHTML = `
+                <td>${Number(jobMeta.dataSize).toLocaleString()}건</td>
+                <td>${jobMeta.type}</td>
+                <td>${memoryUsage}</td>
+                <td>${elapsedTime}초</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${jobInfo.status}</td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+
+        // 페이지 로드 시 초기 메모리 상태 확인
+        window.onload = function() {
+            checkMemoryStatus();
+        };
+
+        // 페이지 종료 시 모니터링 정리
+        window.onbeforeunload = function() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+            }
+        };
+    </script>
+</body>
+</html>
