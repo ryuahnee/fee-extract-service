@@ -4,7 +4,7 @@ on:
   push:
     branches: [ develop, main ]
   pull_request:
-      branches: [ develop, main ]
+      branches: [ main ]
 
 jobs:
   test:
@@ -29,6 +29,7 @@ jobs:
   build:
     needs: test  # test job이 성공해야 실행
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event.name =='push'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
