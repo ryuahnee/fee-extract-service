@@ -4,15 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.text.DecimalFormat;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Slf4j
 public class MemoryMonitor {
     
     private final DecimalFormat df = new DecimalFormat("#,###.##");
-    private final Map<String, Long> memorySnapshots = new HashMap<>();
+    private final Map<String, Long> memorySnapshots = new ConcurrentHashMap<>();
     
     /**
      * 현재 메모리 사용량 측정 및 로깅

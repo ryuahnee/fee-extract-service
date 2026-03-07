@@ -17,13 +17,19 @@ public enum JobStatus {
     public String getDescription() {
         return this.description;
     }
-    //완료 되었는지?
+    // 완료 되었는지?
     public boolean isCompleted() {
         return this == COMPLETED;
     }
-    // 종료 상태인지? (완료 또는 실패)
+
+    // 실패 상태인지?
     public boolean isFailed() {
-        return this == FAILED || this == COMPLETED;
+        return this == FAILED;
+    }
+
+    // 종료 상태인지? (완료 또는 실패)
+    public boolean isTerminated() {
+        return this == COMPLETED || this == FAILED;
     }
 
     // 진행 상태인지?

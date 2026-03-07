@@ -47,5 +47,18 @@ class SimpleAsyncServiceTest {
         assertEquals(jobManager.getJob(jobId).getProgress(), 70);
     }
 
+    @Test
+    @DisplayName("잡 생성 시 taskName이 올바르게 저장된다")
+    void 잡생성_taskName_저장확인(){
+        String taskName = "수수료 추출 작업";
+        String jobId = jobManager.createJob(taskName);
+        assertEquals(taskName, jobManager.getJob(jobId).getTaskName());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 jobId 조회 시 null 반환")
+    void 없는_jobId_조회시_null반환(){
+        assertNull(jobManager.getJob("존재하지-않는-id"));
+    }
 
 }

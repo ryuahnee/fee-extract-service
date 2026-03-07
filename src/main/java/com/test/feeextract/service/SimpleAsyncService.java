@@ -14,9 +14,17 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+
 @Service
 @Slf4j
 public class SimpleAsyncService {
+
+    // Self-Invocation 문제 해결: 프록시를 통해 @Async가 동작하도록 자기 자신을 주입
+    @Autowired
+    @Lazy
+    private SimpleAsyncService self;
 
     // 작업들을 저장할 map
     private final Map<String, JobInfo> jobs = new ConcurrentHashMap<>();
@@ -28,6 +36,7 @@ public class SimpleAsyncService {
         jobs.put(jobId,
                 JobInfo.builder()
                         .jobId(jobId)
+                        .taskName(taskName)
                         .status(JobStatus.RUNNING)
                         .progress(0)
                         .message("작업준비중..")
@@ -76,8 +85,7 @@ public class SimpleAsyncService {
         
         jobs.entrySet().removeIf(entry -> {
             JobInfo job = entry.getValue();
-            return job.getStartTime().isBefore(cutoff) && 
-                   (job.getStatus() == JobStatus.COMPLETED || job.getStatus() == JobStatus.FAILED);
+            return job.getStartTime().isBefore(cutoff) && job.getStatus().isTerminated();
         });
         
         int afterSize = jobs.size();
@@ -150,7 +158,8 @@ public class SimpleAsyncService {
         log.info("배치 처리 시작 - 대상: {}", userNames);
         long startTime = System.currentTimeMillis();
         for(String name : userNames) {
-            processUser(name);
+            // self 프록시를 통해 호출해야 @Async가 동작함 (Self-Invocation 방지)
+            self.processUser(name);
         }
         long endTime =  System.currentTimeMillis();
         log.info("유저수:{} , 작업 처리 시간 : {}", userNames.size() ,endTime-startTime);
